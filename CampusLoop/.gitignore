@@ -1,1 +1,6 @@
-aaaaaa
+node_modules/
+.env
+dist/
+build/
+.DS_Store
+backend/uploads/
