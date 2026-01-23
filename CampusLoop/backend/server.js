@@ -3,13 +3,13 @@ require("dotenv").config();
 const connectDB = require("./config/db");
 const express = require("express");
 const cors = require("cors");
+const authRoutes = require("./routes/authRoutes");
 
 // Import routes
 const taskRoutes = require("./routes/taskRoutes");
 const dashboardRoutes = require("./routes/DashboardRoutes");
 const goalRoutes = require("./routes/goalRoutes");
 const pomodoroRoutes = require("./routes/pomodoroRoutes");
-
 // Connect to MongoDB
 connectDB();
 
@@ -23,6 +23,8 @@ app.use("/api/tasks", taskRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/goals", goalRoutes);
 app.use("/api/pomodoro", pomodoroRoutes);
+app.use("/api/auth", authRoutes); // <--- ADD THIS
+app.use("/api/tasks", taskRoutes);
 
 app.get("/", (req, res) => {
   res.json({ 

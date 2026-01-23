@@ -1,8 +1,14 @@
-// models/task_temp.js - Just add category and tags fields
+// backend/models/task_temp.js
 const mongoose = require("mongoose");
 
 const taskSchema = new mongoose.Schema(
   {
+    // NEW: Link task to a specific user
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+      ref: "User", // Connects to the User model
+    },
     title: { type: String, required: true },
     description: { type: String, required: true },
     dueDate: { 
@@ -19,18 +25,16 @@ const taskSchema = new mongoose.Schema(
       enum: ["Low", "Medium", "High"], 
       default: "Low" 
     },
-    // Add these two optional fields for better organization
     category: {
       type: String,
       enum: ["Work", "Personal", "Shopping", "Health", "Other"],
       default: "Other"
     },
-    tags: [String] // Simple array of strings
+    tags: [String]
   },
   { timestamps: true }
 );
 
-// Add a virtual property for overdue status
 taskSchema.virtual('isOverdue').get(function() {
   return this.status === "Pending" && new Date(this.dueDate) < new Date();
 });

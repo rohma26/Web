@@ -1,23 +1,26 @@
-// backend/routes/taskRoutes.js - UPDATED VERSION
+// backend/routes/taskRoutes.js
 const express = require("express");
 const router = express.Router();
-const Task = require("../models/task_temp");
+const Task = require("../models/task_temp"); // Or "../models/Task" if you renamed it
+const { protect } = require("../middleware/authMiddleware"); // Import the guard
 
-// GET all tasks
-router.get("/", async (req, res) => {
+// 1. GET all tasks (Only for logged-in user)
+router.get("/", protect, async (req, res) => {
   try {
-    const tasks = await Task.find();
+    const tasks = await Task.find({ user: req.user.id }).sort({ createdAt: -1 });
     res.json(tasks);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
 
-// POST create a task
-router.post("/", async (req, res) => {
+// 2. POST create a task (Attach user ID)
+router.post("/", protect, async (req, res) => {
   try {
     const { title, description, dueDate, status, priority, category, tags } = req.body;
+    
     const task = new Task({ 
+      user: req.user.id, // <--- IMPORTANT: Link task to user
       title, 
       dueDate, 
       description, 
@@ -26,6 +29,7 @@ router.post("/", async (req, res) => {
       category: category || "Other",
       tags: tags || []
     });
+
     const newTask = await task.save();
     res.status(201).json(newTask);
   } catch (error) {
@@ -33,20 +37,27 @@ router.post("/", async (req, res) => {
   }
 });
 
-// PUT update a task
-router.put("/:id", async (req, res) => {
+// 3. PUT update a task (Ensure ownership)
+router.put("/:id", protect, async (req, res) => {
   try {
     const task = await Task.findById(req.params.id);
+
     if (!task) return res.status(404).json({ message: "Task not found" });
 
-    const { title, description, status, priority, category, tags } = req.body;
+    // Check if the user owns this task
+    if (task.user.toString() !== req.user.id) {
+      return res.status(401).json({ message: "User not authorized" });
+    }
 
-    if (title !== undefined) task.title = title;
-    if (description !== undefined) task.description = description;
-    if (status !== undefined) task.status = status;
-    if (priority !== undefined) task.priority = priority;
-    if (category !== undefined) task.category = category;
-    if (tags !== undefined) task.tags = tags;
+    const { title, description, status, priority, category, tags } = req.body;
+    
+    // Update fields
+    if (title) task.title = title;
+    if (description) task.description = description;
+    if (status) task.status = status;
+    if (priority) task.priority = priority;
+    if (category) task.category = category;
+    if (tags) task.tags = tags;
 
     const updatedTask = await task.save();
     res.json(updatedTask);
@@ -55,11 +66,16 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// DELETE a task
-router.delete("/:id", async (req, res) => {
+// 4. DELETE a task (Ensure ownership)
+router.delete("/:id", protect, async (req, res) => {
   try {
     const task = await Task.findById(req.params.id);
+
     if (!task) return res.status(404).json({ message: "Task not found" });
+
+    if (task.user.toString() !== req.user.id) {
+      return res.status(401).json({ message: "User not authorized" });
+    }
 
     await task.deleteOne();
     res.json({ message: "Task deleted successfully" });
@@ -68,94 +84,13 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-// NEW: GET recent tasks for dashboard
-router.get("/recent", async (req, res) => {
+// 5. GET recent tasks
+router.get("/recent", protect, async (req, res) => {
   try {
-    const recentTasks = await Task.find()
+    const recentTasks = await Task.find({ user: req.user.id })
       .sort({ createdAt: -1 })
       .limit(5);
     res.json(recentTasks);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// NEW: GET tasks stats for dashboard
-router.get("/stats", async (req, res) => {
-  try {
-    const totalTasks = await Task.countDocuments();
-    const completedTasks = await Task.countDocuments({ status: "Completed" });
-    const pendingTasks = await Task.countDocuments({ status: "Pending" });
-    
-    // Calculate overdue tasks
-    const overdueTasks = await Task.countDocuments({
-      status: "Pending",
-      dueDate: { $lt: new Date() }
-    });
-
-    // Calculate weekly completion
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    
-    const weeklyCompleted = await Task.countDocuments({
-      status: "Completed",
-      updatedAt: { $gte: oneWeekAgo }
-    });
-
-    res.json({
-      total: totalTasks,
-      completed: completedTasks,
-      pending: pendingTasks,
-      overdue: overdueTasks,
-      weeklyCompleted: weeklyCompleted
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// NEW: GET tasks by filter
-router.get("/filter/:filter", async (req, res) => {
-  try {
-    let query = {};
-    const { filter } = req.params;
-
-    switch (filter) {
-      case "completed":
-        query = { status: "Completed" };
-        break;
-      case "pending":
-        query = { status: "Pending" };
-        break;
-      case "overdue":
-        query = { 
-          status: "Pending",
-          dueDate: { $lt: new Date() }
-        };
-        break;
-      case "today":
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        
-        query = {
-          dueDate: {
-            $gte: today,
-            $lt: tomorrow
-          }
-        };
-        break;
-      case "high":
-        query = { priority: "High" };
-        break;
-      default:
-        // Return all tasks
-        break;
-    }
-
-    const tasks = await Task.find(query);
-    res.json(tasks);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

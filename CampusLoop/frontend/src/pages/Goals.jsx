@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { FaBullseye, FaPlus, FaCheckCircle, FaCalendarAlt, FaTrash } from "react-icons/fa";
-
-const Goals = () => {
+import api from '../utils/axiosConfig';
+function Goals() {
   const [goals] = useState([
     { id: 1, title: "Complete 10 Tasks", type: "Weekly", target: 10, current: 7, deadline: "2024-03-20", progress: 70 },
     { id: 2, title: "30 Pomodoro Sessions", type: "Monthly", target: 30, current: 18, deadline: "2024-03-31", progress: 60 },
@@ -38,6 +38,6 @@ const Goals = () => {
       </div>
     </div>
   );
-};
+}
 
 export default Goals;

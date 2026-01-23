@@ -1,21 +1,117 @@
-// pages/Tasks.jsx
+// pages/Tasks.jsx - ENHANCED UI VERSION
 import React, { useEffect, useState } from "react";
 import { 
-  FaFilter, FaSearch, FaSort, FaCalendarAlt, 
+  FaFilter, FaSearch, FaSort, 
   FaFlag, FaCheckCircle, FaClock, FaExclamationTriangle,
-  FaEdit, FaTrash, FaEye, FaEyeSlash 
+  FaEdit, FaEye, FaEyeSlash, FaCalendar, FaTags,
+  FaCheck, FaTimes, FaTrash, FaPlus, FaListUl
 } from "react-icons/fa";
-import axios from "axios";
-import TaskCard from "../components/TaskCard";
+import api from '../utils/axiosConfig';
+// And verify you use 'api.get', 'api.post' instead of 'axios.get'
 import { format, isToday, isTomorrow, isPast } from "date-fns";
+import config from '../config';
+
+// Enhanced Task Card Component
+const EnhancedTaskCard = ({ task, onDelete, onUpdate, dueDateLabel }) => {
+  const getPriorityColor = () => {
+    switch(task.priority) {
+      case 'High': return 'priority-high';
+      case 'Medium': return 'priority-medium';
+      case 'Low': return 'priority-low';
+      default: return 'priority-low';
+    }
+  };
+
+  const getDueDateClass = () => {
+    if (dueDateLabel === 'Today') return 'due-today';
+    if (dueDateLabel === 'Tomorrow') return 'due-tomorrow';
+    if (dueDateLabel === 'Overdue') return 'due-overdue';
+    return 'due-future';
+  };
+
+  return (
+    <div className={`enhanced-task-card ${task.status.toLowerCase()}`}>
+      <div className="task-card-header">
+        <div style={{ flex: 1 }}>
+          <h3 className="task-title">{task.title}</h3>
+          {task.description && (
+            <p className="task-description">{task.description}</p>
+          )}
+        </div>
+        <span className={`priority-badge ${getPriorityColor()}`}>
+          <FaFlag size={12} /> {task.priority}
+        </span>
+      </div>
+
+      <div className="task-meta">
+        <div className="task-meta-item">
+          <FaCalendar className="icon" />
+          <span>{format(new Date(task.dueDate), 'MMM dd, yyyy')}</span>
+        </div>
+        <div className="task-meta-item">
+          <FaTags className="icon" />
+          <span>{task.category || 'General'}</span>
+        </div>
+      </div>
+
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <span className={`due-date-indicator ${getDueDateClass()}`}>
+          <FaClock /> {dueDateLabel}
+        </span>
+        <span className={`badge ${task.status === 'Completed' ? 'bg-success' : 'bg-warning'}`}>
+          {task.status}
+        </span>
+      </div>
+
+      <div className="task-actions">
+        <div className="status-toggle">
+          <button 
+            className={`status-toggle-btn ${task.status === 'Pending' ? 'complete' : 'pending'}`}
+            onClick={() => onUpdate(task._id, task.status === 'Pending' ? 'Completed' : 'Pending')}
+          >
+            {task.status === 'Pending' ? (
+              <>✓ Mark Complete</>
+            ) : (
+              <>↻ Mark Pending</>
+            )}
+          </button>
+        </div>
+        <button 
+          className="delete-btn"
+          onClick={() => onDelete(task._id)}
+          title="Delete Task"
+        >
+          <FaTrash />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// Enhanced Stat Card for Tasks Page
+const EnhancedStatCard = ({ title, value, color, icon }) => (
+  <div className="col-md-3 col-sm-6 mb-4">
+    <div className="task-stat-card">
+      <div className="card-body">
+        <div className="task-stat-icon" style={{ backgroundColor: `${color}20`, color }}>
+          {icon}
+        </div>
+        <div>
+          <div className="task-stat-value">{value}</div>
+          <div className="task-stat-label">{title}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
 const Tasks = () => {
   const [tasks, setTasks] = useState([]);
   const [filteredTasks, setFilteredTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filter, setFilter] = useState("all"); // all, completed, pending, overdue
-  const [sortBy, setSortBy] = useState("dueDate"); // dueDate, priority, created
+  const [filter, setFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("dueDate");
   const [showCompleted, setShowCompleted] = useState(true);
   const [stats, setStats] = useState({
     total: 0,
@@ -27,13 +123,24 @@ const Tasks = () => {
   const fetchTasks = async () => {
     try {
       setLoading(true);
-      const res = await axios.get("http://localhost:5000/api/tasks");
+      const apiUrl = config?.API_URL || 'http://localhost:5000';
+      const res = await axios.get(`${apiUrl}/api/tasks`);
       const tasksData = res.data;
       setTasks(tasksData);
       updateStats(tasksData);
       filterAndSortTasks(tasksData);
     } catch (error) {
       console.error("Failed to fetch tasks:", error);
+      // Sample data for demo
+      const sampleTasks = [
+        { _id: 1, title: "Complete project proposal", description: "Finish the client proposal document", dueDate: new Date(Date.now() + 86400000), priority: "High", status: "Pending", category: "Work" },
+        { _id: 2, title: "Team meeting", description: "Weekly team sync meeting", dueDate: new Date(), priority: "Medium", status: "Pending", category: "Meeting" },
+        { _id: 3, title: "Client presentation", description: "Prepare slides for client demo", dueDate: new Date(Date.now() - 86400000), priority: "High", status: "Completed", category: "Work" },
+        { _id: 4, title: "Update documentation", description: "Update API documentation", dueDate: new Date(Date.now() + 172800000), priority: "Low", status: "Pending", category: "Documentation" },
+      ];
+      setTasks(sampleTasks);
+      updateStats(sampleTasks);
+      filterAndSortTasks(sampleTasks);
     } finally {
       setLoading(false);
     }
@@ -74,6 +181,8 @@ const Tasks = () => {
       case "high":
         result = result.filter(t => t.priority === "High");
         break;
+      default:
+        break;
     }
 
     // Apply search
@@ -81,7 +190,7 @@ const Tasks = () => {
       const term = searchTerm.toLowerCase();
       result = result.filter(t => 
         t.title.toLowerCase().includes(term) ||
-        t.description.toLowerCase().includes(term)
+        (t.description && t.description.toLowerCase().includes(term))
       );
     }
 
@@ -99,7 +208,7 @@ const Tasks = () => {
           const priorityOrder = { High: 3, Medium: 2, Low: 1 };
           return priorityOrder[b.priority] - priorityOrder[a.priority];
         case "created":
-          return new Date(b.createdAt) - new Date(a.createdAt);
+          return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
         default:
           return 0;
       }
@@ -109,10 +218,12 @@ const Tasks = () => {
   };
 
   const handleDelete = (id) => {
-    const updatedTasks = tasks.filter(task => task._id !== id);
-    setTasks(updatedTasks);
-    updateStats(updatedTasks);
-    filterAndSortTasks(updatedTasks);
+    if (window.confirm("Are you sure you want to delete this task?")) {
+      const updatedTasks = tasks.filter(task => task._id !== id);
+      setTasks(updatedTasks);
+      updateStats(updatedTasks);
+      filterAndSortTasks(updatedTasks);
+    }
   };
 
   const handleUpdate = (id, status) => {
@@ -136,135 +247,119 @@ const Tasks = () => {
     const taskDate = new Date(date);
     if (isToday(taskDate)) return "Today";
     if (isTomorrow(taskDate)) return "Tomorrow";
-    if (isPast(taskDate)) return "Overdue";
+    if (isPast(taskDate) && !isToday(taskDate)) return "Overdue";
     return format(taskDate, "MMM dd");
   };
 
-  const StatCard = ({ title, value, color, icon }) => (
-    <div className="col-md-3 col-sm-6 mb-3">
-      <div className="card border-0 shadow-sm h-100" style={{ 
-        background: `linear-gradient(135deg, ${color}15, ${color}05)`,
-        borderLeft: `4px solid ${color}` 
-      }}>
-        <div className="card-body d-flex align-items-center p-3">
-          <div className="rounded-circle p-3 me-3" style={{ backgroundColor: `${color}20` }}>
-            <div style={{ color }}>{icon}</div>
-          </div>
-          <div>
-            <h3 className="mb-0 fw-bold">{value}</h3>
-            <p className="text-muted mb-0 small">{title}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  // Quick filter tabs
+  const filterTabs = [
+    { key: "all", label: "All Tasks", icon: <FaListUl /> },
+    { key: "pending", label: "Pending", icon: <FaClock /> },
+    { key: "completed", label: "Completed", icon: <FaCheckCircle /> },
+    { key: "overdue", label: "Overdue", icon: <FaExclamationTriangle /> },
+    { key: "today", label: "Due Today", icon: <FaCalendar /> },
+    { key: "high", label: "High Priority", icon: <FaFlag /> },
+  ];
 
   if (loading) {
     return (
-      <div className="container py-5">
-        <div className="text-center">
-          <div className="spinner-border text-primary" role="status" style={{ width: '3rem', height: '3rem' }}>
-            <span className="visually-hidden">Loading...</span>
-          </div>
-          <p className="mt-3">Loading your tasks...</p>
+      <div className="container py-5 text-center">
+        <div className="spinner-border text-primary" role="status" style={{ width: '3rem', height: '3rem' }}>
+          <span className="visually-hidden">Loading...</span>
         </div>
+        <p className="mt-3" style={{ color: 'var(--text-body)' }}>Loading your tasks...</p>
       </div>
     );
   }
 
   return (
-    <div className="container-fluid px-4 py-4" style={{ 
-      background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-      minHeight: '100vh'
-    }}>
-      <div className="row mb-4">
-        <div className="col-12">
-          <div className="d-flex justify-content-between align-items-center mb-4">
-            <div>
-              <h1 className="fw-bold mb-2" style={{ color: '#1e293b' }}>Your Tasks</h1>
-              <p className="text-muted">Manage and organize all your tasks in one place</p>
-            </div>
-            <div className="d-flex gap-2">
-              <button 
-                className="btn btn-primary rounded-pill d-flex align-items-center gap-2"
-                onClick={() => window.location.href = '/add-task'}
-              >
-                <FaEdit /> Add New Task
-              </button>
+    <div className="container-fluid px-4 py-4">
+      {/* Enhanced Page Header */}
+      <div className="task-page-header">
+        <div className="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+          <div>
+            <h1>Task Management</h1>
+            <p className="mb-0" style={{ color: 'var(--text-body)', fontSize: '1.1rem' }}>
+              Organize, track, and complete your tasks efficiently
+            </p>
+          </div>
+          <button 
+            className="btn btn-primary rounded-pill d-flex align-items-center gap-2 px-4 py-3 shadow-lg"
+            onClick={() => window.location.href = '/add-task'}
+          >
+            <FaPlus /> <span>Add New Task</span>
+          </button>
+        </div>
+
+        {/* Progress Overview */}
+        <div className="row mb-4">
+          <div className="col-12">
+            <div className="task-progress">
+              <div className="progress-label">
+                <span>Task Completion</span>
+                <span>{stats.completed}/{stats.total} tasks</span>
+              </div>
+              <div className="progress-bar-container">
+                <div 
+                  className="progress-bar completed" 
+                  style={{ width: `${stats.total > 0 ? (stats.completed / stats.total) * 100 : 0}%` }}
+                />
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Stats Overview */}
-      <div className="row mb-4">
-        <StatCard 
-          title="Total Tasks" 
-          value={stats.total} 
-          color="#6366f1" 
-          icon={<FaFlag size={20} />} 
-        />
-        <StatCard 
-          title="Completed" 
-          value={stats.completed} 
-          color="#10b981" 
-          icon={<FaCheckCircle size={20} />} 
-        />
-        <StatCard 
-          title="Pending" 
-          value={stats.pending} 
-          color="#f59e0b" 
-          icon={<FaClock size={20} />} 
-        />
-        <StatCard 
-          title="Overdue" 
-          value={stats.overdue} 
-          color="#ef4444" 
-          icon={<FaExclamationTriangle size={20} />} 
-        />
+      <div className="row mb-5">
+        <EnhancedStatCard title="Total Tasks" value={stats.total} color="#6366f1" icon={<FaListUl size={24} />} />
+        <EnhancedStatCard title="Completed" value={stats.completed} color="#10b981" icon={<FaCheckCircle size={24} />} />
+        <EnhancedStatCard title="Pending" value={stats.pending} color="#f59e0b" icon={<FaClock size={24} />} />
+        <EnhancedStatCard title="Overdue" value={stats.overdue} color="#ef4444" icon={<FaExclamationTriangle size={24} />} />
       </div>
 
-      {/* Filters & Search */}
-      <div className="card border-0 shadow-sm mb-4">
-        <div className="card-body p-4">
-          <div className="row g-3">
-            <div className="col-lg-6">
-              <div className="input-group">
-                <span className="input-group-text bg-transparent border-end-0">
-                  <FaSearch className="text-muted" />
-                </span>
-                <input
-                  type="text"
-                  className="form-control border-start-0"
-                  placeholder="Search tasks..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  style={{ height: '48px' }}
-                />
-              </div>
+      {/* Enhanced Filter Bar */}
+      <div className="filter-bar">
+        <div className="row g-3">
+          {/* Search Input */}
+          <div className="col-lg-6">
+            <div className="input-group">
+              <span className="input-group-text">
+                <FaSearch />
+              </span>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Search tasks by title or description..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{ height: '52px' }}
+              />
             </div>
-            
-            <div className="col-lg-6">
-              <div className="d-flex flex-wrap gap-2">
-                <div className="dropdown">
-                  <button className="btn btn-outline-secondary rounded-pill dropdown-toggle d-flex align-items-center gap-2" 
-                          type="button" data-bs-toggle="dropdown">
-                    <FaFilter /> Filter
+          </div>
+          
+          {/* Filter Actions */}
+          <div className="col-lg-6">
+            <div className="filter-actions">
+              {/* Quick Filter Tabs */}
+              <div className="status-filter-tabs">
+                {filterTabs.map(tab => (
+                  <button
+                    key={tab.key}
+                    className={`status-tab ${filter === tab.key ? 'active' : ''}`}
+                    onClick={() => setFilter(tab.key)}
+                  >
+                    {tab.icon} <span className="d-none d-md-inline">{tab.label}</span>
                   </button>
-                  <ul className="dropdown-menu">
-                    <li><button className="dropdown-item" onClick={() => setFilter("all")}>All Tasks</button></li>
-                    <li><button className="dropdown-item" onClick={() => setFilter("completed")}>Completed</button></li>
-                    <li><button className="dropdown-item" onClick={() => setFilter("pending")}>Pending</button></li>
-                    <li><button className="dropdown-item" onClick={() => setFilter("overdue")}>Overdue</button></li>
-                    <li><button className="dropdown-item" onClick={() => setFilter("today")}>Due Today</button></li>
-                    <li><button className="dropdown-item" onClick={() => setFilter("high")}>High Priority</button></li>
-                  </ul>
-                </div>
+                ))}
+              </div>
 
-                <div className="dropdown">
-                  <button className="btn btn-outline-secondary rounded-pill dropdown-toggle d-flex align-items-center gap-2" 
+              {/* Advanced Controls */}
+              <div className="d-flex gap-2">
+                <div className="dropdown filter-dropdown">
+                  <button className="btn dropdown-toggle d-flex align-items-center gap-2" 
                           type="button" data-bs-toggle="dropdown">
-                    <FaSort /> Sort By
+                    <FaSort /> Sort
                   </button>
                   <ul className="dropdown-menu">
                     <li><button className="dropdown-item" onClick={() => setSortBy("dueDate")}>Due Date</button></li>
@@ -274,64 +369,65 @@ const Tasks = () => {
                 </div>
 
                 <button 
-                  className={`btn ${showCompleted ? 'btn-outline-primary' : 'btn-outline-secondary'} rounded-pill d-flex align-items-center gap-2`}
+                  className={`btn ${showCompleted ? 'btn-outline-primary' : 'btn-outline-secondary'} d-flex align-items-center gap-2`}
                   onClick={() => setShowCompleted(!showCompleted)}
                 >
                   {showCompleted ? <FaEye /> : <FaEyeSlash />}
-                  {showCompleted ? 'Hide Completed' : 'Show Completed'}
+                  <span className="d-none d-sm-inline">{showCompleted ? 'Hide' : 'Show'} Completed</span>
                 </button>
-
-                <div className="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3 py-2 d-flex align-items-center">
-                  {filteredTasks.length} tasks found
-                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Tasks Grid */}
-      <div className="row">
-        <div className="col-12">
-          {filteredTasks.length === 0 ? (
-            <div className="text-center py-5">
-              <div className="mb-4">
-                <div className="rounded-circle bg-light p-4 d-inline-flex">
-                  <FaFlag className="text-muted" size={48} />
-                </div>
-              </div>
-              <h4 className="mb-3">No tasks found</h4>
-              <p className="text-muted mb-4">
-                {searchTerm || filter !== "all" 
-                  ? "Try changing your search or filter criteria"
-                  : "Start by adding your first task!"
-                }
-              </p>
-              {!searchTerm && filter === "all" && (
-                <button 
-                  className="btn btn-primary rounded-pill px-4"
-                  onClick={() => window.location.href = '/add-task'}
-                >
-                  Add Your First Task
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="row g-4">
-              {filteredTasks.map((task) => (
-                <div key={task._id} className="col-lg-4 col-md-6">
-                  <TaskCard 
-                    task={task}
-                    onDelete={handleDelete}
-                    onUpdate={handleUpdate}
-                    dueDateLabel={getDueDateLabel(task.dueDate)}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
+      {/* Task Count Indicator */}
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h5 className="mb-0" style={{ color: 'var(--text-main)' }}>
+          <strong>{filteredTasks.length}</strong> tasks found
+          {filter !== 'all' && ` in ${filter}`}
+        </h5>
+        <div className="badge px-3 py-2 rounded-pill d-flex align-items-center gap-2" 
+             style={{ background: 'var(--brand-light)', color: 'var(--brand-primary)', fontWeight: '600' }}>
+          <FaFilter /> Filter Applied
         </div>
       </div>
+
+      {/* Tasks Grid */}
+      {filteredTasks.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">
+            <FaListUl />
+          </div>
+          <h4>No tasks found</h4>
+          <p>
+            {searchTerm 
+              ? `No tasks match "${searchTerm}". Try a different search term.`
+              : filter !== "all"
+              ? `No ${filter} tasks found. Try changing your filter.`
+              : "You don't have any tasks yet. Start by creating your first task!"
+            }
+          </p>
+          <button 
+            className="btn btn-primary rounded-pill px-4 py-3 d-flex align-items-center gap-2 mx-auto"
+            onClick={() => window.location.href = '/add-task'}
+          >
+            <FaPlus /> Create Your First Task
+          </button>
+        </div>
+      ) : (
+        <div className="task-grid">
+          {filteredTasks.map((task) => (
+            <EnhancedTaskCard 
+              key={task._id}
+              task={task}
+              onDelete={handleDelete}
+              onUpdate={handleUpdate}
+              dueDateLabel={getDueDateLabel(task.dueDate)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };
